@@ -1,48 +1,71 @@
 import express from "express";
+import bodyParser from "body-parser";
 import dotenv from "dotenv";
-import { testConnection } from "./config/database.js";
 import schoolRoutes from "./routes/schoolRoutes.js";
+import { testConnection } from "./config/database.js";
 
+// Load environment variables from .env file
 dotenv.config();
 
+// Create Express application instance
 const app = express();
-const port = process.env.PORT || 3001;
 
-app.use(express.json());
-app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Content-Type");
-  if (req.method === "OPTIONS") return res.sendStatus(200);
+// Middleware to parse JSON request bodies
+app.use(bodyParser.json());
+
+// Add basic error handling middleware for JSON parsing
+app.use((error, req, res, next) => {
+  if (error instanceof SyntaxError && error.status === 400 && "body" in error) {
+    return res.status(400).json({ message: "Invalid JSON format" });
+  }
   next();
 });
 
-app.use("/api/schools", schoolRoutes);
+// Mount school routes at root path
+app.use("/", schoolRoutes);
 
+// Default route for API information
 app.get("/", (req, res) => {
   res.json({
     message: "School Management API",
     endpoints: {
-      add: "POST /api/schools/add",
-      list: "GET /api/schools/list?latitude=<lat>&longitude=<lon>",
+      "POST /addSchool": "Add a new school",
+      "GET /listSchools":
+        "List schools by proximity (requires latitude & longitude query params)",
     },
-    status: "Server running on port " + port,
   });
 });
 
-app.use("*", (req, res) => {
-  res.status(404).json({ message: "Endpoint not found" });
-});
+// Get port from environment or use default
+const PORT = process.env.PORT || 3000;
 
-app.use((error, req, res, next) => {
-  res.status(500).json({ message: "Server error" });
-});
-
+// Start server and test database connection
 const startServer = async () => {
-  await testConnection();
-  app.listen(port, () => {
-    console.log(`Server running on port ${port}`);
-  });
+  try {
+    // Test database connection before starting server
+    const dbConnected = await testConnection();
+    if (!dbConnected) {
+      console.error(
+        "❌ Failed to connect to database. Please check your .env configuration."
+      );
+      process.exit(1);
+    }
+
+    // Start the Express server
+    app.listen(PORT, () => {
+      console.log(`✅ Server running at http://localhost:${PORT}`);
+      console.log(`✅ Database connected successfully`);
+      console.log(`📝 API Endpoints:`);
+      console.log(`   POST http://localhost:${PORT}/addSchool`);
+      console.log(
+        `   GET  http://localhost:${PORT}/listSchools?latitude=28.6139&longitude=77.2090`
+      );
+    });
+  } catch (error) {
+    console.error("❌ Failed to start server:", error);
+    process.exit(1);
+  }
 };
 
+// Start the application
 startServer();
