@@ -61,5 +61,3 @@ Returns schools sorted by distance from the provided coordinates.
 - Node.js
 - Express.js
 - MySQL
-- dotenv
-- Google Cloud SQL
